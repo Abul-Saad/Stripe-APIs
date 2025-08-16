@@ -33,7 +33,7 @@ It also includes a simple frontend (`stripe.html`) for testing payments.
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/stripe-node-express.git
+git clone https://github.com/Abul-Saad/Stripe-APIs.git
 cd stripe-node-express
 npm install
 Create a .env file in the root directory:
