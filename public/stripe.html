@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stripe Payment Test</title>
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <h2>Stripe Payment UI Test</h2>
+  <label>Amount (INR): <input id="amount" type="number" value="5" /></label><br><br>
+  <label>Email: <input id="email" value="test@yopmail.com" /></label><br><br>
+  <div id="card-element"></div><br>
+  <button onclick="makePayment()">Pay Now</button>
+  <p id="result"></p>
+
+  <script>
+    const stripe = Stripe("pk_test_key"); 
+    const elements = stripe.elements();
+    const card = elements.create("card");
+    card.mount("#card-element");
+
+    async function makePayment() {
+      const amount = document.getElementById("amount").value;
+      const email = document.getElementById("email").value;
+      const resultEl = document.getElementById("result");
+
+      try {
+        // 1️⃣ Create PaymentIntent
+        const res = await fetch("/api/payments/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ amount: Number(amount), currency: "inr", customer_email: email })
+        });
+
+        const data = await res.json();
+        if (!data.clientSecret) {
+          resultEl.innerHTML = "❌ " + (data.error || "Failed to create payment intent.");
+          return;
+        }
+
+        // 2️⃣ Confirm Payment with Stripe
+        const result = await stripe.confirmCardPayment(data.clientSecret, {
+          payment_method: { card: card, billing_details: { email } }
+        });
+
+        if (result.error) {
+          resultEl.innerHTML = "❌ Payment failed: " + result.error.message;
+          return;
+        }
+
+        // 3️⃣ If succeeded, call backend to confirm payment
+        if (result.paymentIntent.status === "succeeded") {
+          const confirmRes = await fetch("/api/payments/confirm-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paymentIntentId: result.paymentIntent.id })
+          });
+          const confirmData = await confirmRes.json();
+
+          if (confirmData.status === "success") {
+            resultEl.innerHTML = "✅ Payment successful & confirmed!";
+          } else {
+            resultEl.innerHTML = "⚠️ Payment succeeded but confirmation failed: " + (confirmData.message || "Unknown error");
+          }
+        } else {
+          resultEl.innerHTML = "⚠️ Payment status: " + result.paymentIntent.status;
+        }
+      } catch (err) {
+        resultEl.innerHTML = "❌ Error: " + err.message;
+      }
+    }
+  </script>
+</body>
+</html>
